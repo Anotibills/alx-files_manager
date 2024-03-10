@@ -57,9 +57,9 @@ At the end of this project, you are expected to be able to [explain to anyone](h
 ```package.json```
 
 <details>
-<summary>Click to show/hide file contents</summary>
-```javascipt
+  <summary>Click to show/hide file contents</summary>
 
+```javascipt
 {
   "name": "files_manager",
   "version": "1.0.0",
@@ -104,8 +104,9 @@ At the end of this project, you are expected to be able to [explain to anyone](h
     "sinon": "^7.5.0"
   }
 }
-</details>
 ```
+</details>
+
 
 ```.eslintrc.js```
 
