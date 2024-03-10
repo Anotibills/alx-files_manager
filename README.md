@@ -111,7 +111,8 @@ At the end of this project, you are expected to be able to [explain to anyone](h
 ```.eslintrc.js```
 
 <details>
-<summary>Click to show/hide file contents</summary>
+  <summary>Click to show/hide file contents</summary>
+
 ```javascript
 module.exports = {
     env: {
@@ -155,7 +156,8 @@ module.exports = {
 
 ```babel.config.js```
 <details>
-<summary>Click to show/hide file contents</summary>
+  <summary>Click to show/hide file contents</summary>
+
 ```javascript
 module.exports = {
     presets: [
