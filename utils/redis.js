@@ -22,7 +22,7 @@ class RedisClient {
     // Promisify the get method of the Redis client
     const getAsync = promisify(this.client.get).bind(this.client);
     // Return the result of the get method
-    return await getAsync(key);
+    return getAsync(key);
   }
 
   async set(key, value, durationInSeconds) {
