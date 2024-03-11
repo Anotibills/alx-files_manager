@@ -1,25 +1,16 @@
 import express from 'express';
 import AppController from '../controllers/AppController';
+import UsersController from '../controllers/UsersController';
 
 const router = express.Router();
 
 /**
- * Endpoint: /status
- * Method: GET
- * Description: Check the status of Redis and the database.
- * Returns:
- *   - If both Redis and the database are alive: { "redis": true, "db": true }
- *   - If either Redis or the database is not alive:
- *   Status code 500 with { "redis": false, "db": false }
+ * GET /status - Check the status of Redis and the database.
+ * GET /stats - Get the number of users and files in the database.
+ * POST /users - Create a new user in the database.
  */
 router.get('/status', AppController.getStatus);
-
-/**
- * Endpoint: /stats
- * Method: GET
- * Description: Get the number of users and files in the database.
- * Returns: { "users": <number_of_users>, "files": <number_of_files> }
- */
 router.get('/stats', AppController.getStats);
+router.post('/users', UsersController.postNew);
 
 export default router;
