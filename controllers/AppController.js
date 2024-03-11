@@ -1,7 +1,13 @@
-import redisClient from '../utils/redis.js';
-import dbClient from '../utils/db.js';
+import redisClient from '../utils/redis';
+import dbClient from '../utils/db';
 
 const AppController = {
+  /**
+   * Get the status of Redis and the database.
+   * @params {Request} req The request object.
+   * @params {Response} res The response object.
+   * @return {Object} The status of Redis and the database'
+   */
   async getStatus(req, res) {
     const redisStatus = redisClient.isAlive();
     const dbStatus = dbClient.isAlive();
@@ -13,6 +19,12 @@ const AppController = {
     }
   },
 
+  /**
+   * Get the number of users and files in the database.
+   * @param {Request} req The request object.
+   * @param {Response} res The response object.
+   * @returns {Object} The number of users and files.
+   */
   async getStats(req, res) {
     try {
       const numUsers = await dbClient.nbUsers();
