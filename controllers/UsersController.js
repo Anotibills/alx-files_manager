@@ -32,10 +32,10 @@ export default class UsersController {
         .insertOne({ email, password: sha1(password) });
 
       // Return the new user
-      res.status(201).json({ id: newUser.insertedId, email });
+      return res.status(201).json({ id: newUser.insertedId, email });
     } catch (error) {
       console.error('Error creating user:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+      return res.status(500).json({ error: 'Internal Server Error' });
     }
   }
 }
