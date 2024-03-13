@@ -37,6 +37,8 @@ export default class UsersController {
         .insertOne({ email, password: sha1(password) });
 
       // Return the new user
+      const userId = newUser.insertedId.toString();
+
       userQueue.add({ userId });
       return res.status(201).json({ id: newUser.insertedId, email });
     } catch (error) {
