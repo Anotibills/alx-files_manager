@@ -93,6 +93,59 @@ class FilesController {
       parentId: parentId || 0,
     });
   }
+
+  static async getShow(request, response) {
+  const user = await FilesController.getUser(request);
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const fileId = request.param.id;
+  const userId = user._id.toString();
+  const files = await dbClient.filesCollection();
+  const file = await files.findOne({
+    _id : new mongoDBCore.BSON.ObjectId(fileId),
+    userId : new mongoDBCore.BSON.ObjectId(userId),
+  });
+  if (!file) {
+    return response.status(404).json({ error: 'Not found' });
+  }
+  return response.status(200).json(file);
+  }	
+
+  static async getIndex(request, response) {
+  const user = await FilesController.getUser(request);
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const parentId = request.query.parentId || '0';
+  const page = parseInt(request.query.page) || 0;
+  const pageSize = 20;
+  const skip = page * pageSize;
+
+  const files = dbClient.filesCollection();
+
+  try {
+    const query = { userId: user._id, parentId };
+    const totalFiles = await files.find(query).count();
+    const totalPages = Math.ceil(totalFiles / pageSize);
+
+    const fileDocs = await files.find(query).limit(pageSize).skip(skip).toArray();
+
+    return response.status(200).json({
+      files: fileDocs,
+      pageInfo: {
+        totalFiles,
+        totalPages,
+        currentPage: page,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    return response.status(500).json({ error: 'Internal Server Error' });
+  }
+}
 }
 
 module.exports = FilesController;
