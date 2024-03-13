@@ -1,7 +1,10 @@
 import sha1 from 'sha1';
 import mongoDBCore from 'mongodb/lib/core';
+import Queue from 'bull';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
+
+const userQueue = new Queue('userQueue');
 
 export default class UsersController {
   /**
@@ -34,6 +37,7 @@ export default class UsersController {
         .insertOne({ email, password: sha1(password) });
 
       // Return the new user
+      userQueue.add({ userId });
       return res.status(201).json({ id: newUser.insertedId, email });
     } catch (error) {
       console.error('Error creating user:', error);
