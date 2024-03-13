@@ -4,7 +4,7 @@ import Queue from 'bull';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
-const userQueue = new Queue('userQueue');
+const fileQueue = new Queue('fileQueue', 'redis://127.0.0.1:6379');
 
 export default class UsersController {
   /**
@@ -39,7 +39,7 @@ export default class UsersController {
       // Return the new user
       const userId = newUser.insertedId.toString();
 
-      userQueue.add({ userId });
+      fileQueue.add({ userId });
       return res.status(201).json({ id: newUser.insertedId, email });
     } catch (error) {
       console.error('Error creating user:', error);

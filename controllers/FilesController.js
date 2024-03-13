@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { promises as fs } from 'fs';
-import { ObjectID } from 'mongodb';
+import mongoDBCore from 'mongodb/lib/core';
 import mime from 'mime-types';
 import Queue from 'bull';
 import dbClient from '../utils/db';
@@ -14,15 +14,20 @@ class FilesController {
     const key = `auth_${token}`;
     const userId = await redisClient.get(key);
     if (userId) {
-      const users = dbClient.db.collection('users');
-      const idObject = new ObjectID(userId);
-      const user = await users.findOne({ _id: idObject });
+      const idObject = new mongoDBCore.BSON.ObjectId(userId);
+      const user = await (await dbClient.usersCollection()).findOne({ _id: idObject });
       return user || null;
     }
     return null;
   }
 
   static async postUpload(request, response) {
+    /**
+   * Create a new file in the database and on disk
+   * @param {Request} req - The request object.
+   * @param {Response} res - The response object.
+   * @returns {Object} - The new file or an error message.
+   */
     const user = await FilesController.getUser(request);
     if (!user) {
       return response.status(401).json({ error: 'Unauthorized' });
@@ -30,22 +35,31 @@ class FilesController {
     const { name, type, parentId, isPublic: isPublicStr, data } = request.body;
     const isPublic = isPublicStr === 'true' || false;
     
-    if (!name || !type || (type !== 'folder' && !data)) {
-      return response.status(400).json({ error: 'Missing required fields' });
+    if (!name) {
+      return response.status(400).json({ error: 'Missing name' });
+    }
+    if (!type || !['folder', 'file', 'image'].include(type)) {
+      return response.status(400).json({ error: 'Missing type' });
+    }
+    if (type !== 'folder' && !data)) {
+      return response.status(400).json({ error: 'Missing data' });
     }
 
-    const files = dbClient.db.collection('files');
+    // const files = dbClient.filesCollection());
     if (parentId) {
-      const idObject = new ObjectID(parentId);
-      const file = await files.findOne({ _id: idObject, userId: user._id });
-      if (!file) {
+      const idObject = new mongoDBCore.BSON.ObjectId(parentId);
+      const parentFile = await dbClient.filesCollection()
+        .findOne({ _id: idObject, userId: user._id });
+      if (!parentFile) {
         return response.status(400).json({ error: 'Parent not found' });
       }
-      if (file.type !== 'folder') {
+      if (parentFile.type !== 'folder') {
         return response.status(400).json({ error: 'Parent is not a folder' });
       }
     }
 
+    const userId = user._id.toString();
+    const baseDir
     if (type === 'folder') {
       try {
         const result = await files.insertOne({
