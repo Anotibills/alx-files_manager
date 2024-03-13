@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import sha1 from 'sha1';
+import mongoDBCore from 'mongodb/lib/core';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 
@@ -11,14 +12,18 @@ export default class AuthController {
    * @returns {Object} - The authentication token or error message.
    */
   static async getConnect(req, res) {
+    const authHeader = req.headers.authorization || null;
+    if (!authHeader || !authHeader.startsWith('Basic ')) {
+      return null;
+    }
+
     const credentials = Buffer.from(req.headers.authorization.split(' ')[1], 'base64').toString('utf-8').split(':');
     const email = credentials[0];
     const password = credentials[1];
 
-    const user = await (await dbClient.usersCollection())
-      .findOne({ email, password: sha1(password) });
+    const user = await (await dbClient.usersCollection()).findOne({ email });
 
-    if (!user) {
+    if (!user || user.password !== sha1(password)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
@@ -39,6 +44,17 @@ export default class AuthController {
     const token = req.headers['x-token'];
 
     if (!token) {
+      return null;
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return null;
+    }
+
+    const user = await (await dbClient.usersCollection())
+      .findOne({ _id: new mongoDBCore.BSON.ObjectId(userId) });
+    if (!user) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
