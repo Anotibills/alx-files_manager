@@ -1,5 +1,6 @@
 import sha1 from 'sha1';
 import dbClient from '../utils/db';
+import redisClient from '../utils/redis';
 
 export default class UsersController {
   /**
@@ -37,5 +38,25 @@ export default class UsersController {
       console.error('Error creating user:', error);
       return res.status(500).json({ error: 'Internal Server Error' });
     }
+  }
+
+  static async getMe(req, res) {
+    const token = req.headers['x-token'];
+
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const user = await (await dbClient.usersCollection()).findOne({ userId });
+    if (!user) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    return res.status.json({ id: user._id.toString(), email: user.email });
   }
 }
