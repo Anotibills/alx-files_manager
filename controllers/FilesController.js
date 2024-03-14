@@ -95,57 +95,84 @@ class FilesController {
   }
 
   static async getShow(request, response) {
-  const user = await FilesController.getUser(request);
-  if (!user) {
-    return response.status(401).json({ error: 'Unauthorized' });
-  }
+    const user = await FilesController.getUser(request);
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
+    }
 
-  const fileId = request.param.id;
-  const userId = user._id.toString();
-  const files = await dbClient.filesCollection();
-  const file = await files.findOne({
-    _id : new mongoDBCore.BSON.ObjectId(fileId),
-    userId : new mongoDBCore.BSON.ObjectId(userId),
-  });
-  if (!file) {
-    return response.status(404).json({ error: 'Not found' });
+    const fileId = request.params.id;
+    const userId = user._id.toString();
+    const files = await dbClient.filesCollection();
+    try {
+      const file = await files.findOne({
+        _id: new mongoDBCore.BSON.ObjectId(fileId),
+        userId: new mongoDBCore.BSON.ObjectId(userId),
+      });
+      if (!file) {
+        return response.status(404).json({ error: 'Not found here' });
+      }
+      return response.status(200).json(file);
+    } catch (error) {
+      console.error(error);
+      return response.status(500).json({ error: 'Internal Server Error' });
+    }
+    // id,
+    // userId,
+    // name: file.name,
+    // type: file.type,
+    // isPublic: file.isPublic,
+    // parentId: file.parentId,
+    // });
   }
-  return response.status(200).json(file);
-  }	
 
   static async getIndex(request, response) {
-  const user = await FilesController.getUser(request);
-  if (!user) {
-    return response.status(401).json({ error: 'Unauthorized' });
-  }
+    const user = await FilesController.getUser(request);
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
+    }
 
-  const parentId = request.query.parentId || '0';
-  const page = parseInt(request.query.page) || 0;
-  const pageSize = 20;
-  const skip = page * pageSize;
+    const {
+      parentId,
+      page,
+    } = request.query;
+    const pageNum = page || 0;
 
-  const files = dbClient.filesCollection();
+    const files = await dbClient.filesCollection();
 
-  try {
-    const query = { userId: user._id, parentId };
-    const totalFiles = await files.find(query).count();
-    const totalPages = Math.ceil(totalFiles / pageSize);
+    let fileQuery;
+    if (!parentId) {
+      fileQuery = { userId: user._id };
+    } else {
+      fileQuery = { userId: user._id, parentId: new mongoDBCore.BSON.ObjectId(parentId) };
+    }
 
-    const fileDocs = await files.find(query).limit(pageSize).skip(skip).toArray();
-
-    return response.status(200).json({
-      files: fileDocs,
-      pageInfo: {
-        totalFiles,
-        totalPages,
-        currentPage: page,
+    files.aggregate([
+      { $match: fileQuery },
+      { $sort: { _id: -1 } },
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(pageNum, 10) } }],
+          data: [{ $skip: 20 * parseInt(pageNum, 10) }, { $limit: 20 }],
+        },
       },
+    ]).toArray((err, result) => {
+      if (result) {
+        const finalFile = result[0].data.map((file) => {
+          const tempFile = {
+            ...file,
+            id: file._id,
+          };
+          delete tempFile._id;
+          delete tempFile.localPath;
+          return tempFile;
+        });
+        return response.status(200).json(finalFile);
+      }
+      console.log('Error Occured');
+      return response.status(404).json({ error: 'Not found' });
     });
-  } catch (error) {
-    console.error(error);
-    return response.status(500).json({ error: 'Internal Server Error' });
+    return null;
   }
-}
 }
 
 module.exports = FilesController;
