@@ -1,33 +1,35 @@
 import Queue from 'bull';
 import imageThumbnail from 'image-thumbnail';
 import { promises as fs } from 'fs';
-import { ObjectID } from 'mongodb';
+import mongoDBCore from 'mongodb/lib/core';
 import dbClient from './utils/db';
 
 const fileQueue = new Queue('fileQueue', 'redis://127.0.0.1:6379');
 const userQueue = new Queue('userQueue', 'redis://127.0.0.1:6379');
 
 async function thumbNail(width, localPath) {
-  try {
-    const thumbnail = await imageThumbnail(localPath, { width });
-    return thumbnail;
-  } catch (error) {
-    console.error('Error generating thumbnail:', error);
-    throw new Error('Thumbnail generation failed');
-  }
+  const thumbnail = await imageThumbnail(localPath, { width });
+  return thumbnail;
 }
 
 fileQueue.process(async (job, done) => {
   console.log('Processing...');
   try {
     const { fileId, userId } = job.data;
-    if (!fileId || !userId) {
-      throw new Error('Missing fileId or userId');
+
+    if (!fileId) {
+      throw new Error('Missing fileId');
+    }
+    if (!userId) {
+      throw new Error('Missing userId');
     }
 
-    const files = dbClient.db.collection('files');
-    const idObject = new ObjectID(fileId);
-    const file = await files.findOne({ _id: idObject });
+    const files = await dbClient.filesCollection();
+    const idObject = new mongoDBCore.BSON.ObjectId(fileId);
+    const file = await files.findOne({
+      _id: idObject,
+      userId: new mongoDBCore.BSon.ObjectId(userId),
+    });
 
     if (!file) {
       console.log('File not found');
@@ -47,7 +49,7 @@ fileQueue.process(async (job, done) => {
     await Promise.all([
       fs.writeFile(image500, thumbnail500),
       fs.writeFile(image250, thumbnail250),
-      fs.writeFile(image100, thumbnail100)
+      fs.writeFile(image100, thumbnail100),
     ]);
     done();
   } catch (error) {
@@ -63,8 +65,8 @@ userQueue.process(async (job, done) => {
       throw new Error('Missing userId');
     }
 
-    const users = dbClient.db.collection('users');
-    const idObject = new ObjectID(userId);
+    const users = await dbClient.usersCollection();
+    const idObject = new mongoDBCore.BSON.ObjectId(userId);
     const user = await users.findOne({ _id: idObject });
 
     if (user) {

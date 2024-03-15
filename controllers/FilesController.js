@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { promises as fs } from 'fs';
 import mongoDBCore from 'mongodb/lib/core';
-// import mime from 'mime-types';
+import mime from 'mime-types';
 import Queue from 'bull';
 import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
@@ -109,20 +109,13 @@ class FilesController {
         userId: new mongoDBCore.BSON.ObjectId(userId),
       });
       if (!file) {
-        return response.status(404).json({ error: 'Not found here' });
+        return response.status(404).json({ error: 'Not found' });
       }
       return response.status(200).json(file);
     } catch (error) {
       console.error(error);
       return response.status(500).json({ error: 'Internal Server Error' });
     }
-    // id,
-    // userId,
-    // name: file.name,
-    // type: file.type,
-    // isPublic: file.isPublic,
-    // parentId: file.parentId,
-    // });
   }
 
   static async getIndex(request, response) {
@@ -173,6 +166,153 @@ class FilesController {
     });
     return null;
   }
+
+  static async putPublish(request, response) {
+    const user = await FilesController.getUser(request);
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const fileId = request.params.id;
+    const userId = user._id.toString();
+
+    const file = await (await dbClient.filesCollection()).findOne({
+      _id: new mongoDBCore.BSON.ObjectId(fileId),
+      userId: new mongoDBCore.BSON.ObjectId(userId),
+    });
+
+    if (!file) {
+      return response.status(404).json({ error: 'Not found' });
+    }
+
+    await (await dbClient.filesCollection())
+      .updateOne({ _id: file._id }, { $set: { isPublic: true } });
+
+    file.isPublic = true;
+    return response.status(200).json(file);
+  }
+
+  static async putUnpublish(request, response) {
+    const user = await FilesController.getUser(request);
+    if (!user) {
+      return response.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const fileId = request.params.id;
+    const userId = user._id.toString();
+
+    const file = await (await dbClient.filesCollection()).findOne({
+      _id: new mongoDBCore.BSON.ObjectId(fileId),
+      userId: new mongoDBCore.BSON.ObjectId(userId),
+    });
+
+    if (!file) {
+      return response.status(404).json({ error: 'Not found' });
+    }
+
+    await (await dbClient.filesCollection())
+      .updateOne({ _id: file._id }, { $set: { isPublic: false } });
+
+    file.isPublic = false;
+    return response.status(200).json(file);
+  }
+
+  static async getFile(request, response) {
+    const { id } = request.params;
+    const files = await dbClient.filesCollection('files');
+    const idObject = new mongoDBCore.BSON.ObjectId(id);
+    files.findOne({ _id: idObject }, async (err, file) => {
+      if (!file) {
+        return response.status(404).json({ error: 'Not found' });
+      }
+      if (file.isPublic) {
+        if (file.type === 'folder') {
+          return response.status(400).json({ error: "A folder doesn't have content" });
+        }
+        try {
+          let filePath = file.localPath;
+          const size = request.param('size');
+          if (size) {
+            filePath = `${file.localPath}_${size}`;
+          }
+          const fileContent = await fs.readFile(filePath);
+          const contentType = mime.contentType(file.name);
+          return response.header('Content-Type', contentType).status(200).send(fileContent);
+        } catch (error) {
+          console.log(error);
+          return response.status(404).json({ error: 'Not found' });
+        }
+      } else {
+        const user = await FilesController.getUser(request);
+        if (!user) {
+          return response.status(404).json({ error: 'Not found' });
+        }
+        if (file.userId.toString() === user._id.toString()) {
+          if (file.type === 'folder') {
+            return response.status(400).json({ error: "A folder doesn't have content" });
+          }
+          try {
+            let filePath = file.localPath;
+            const size = request.param('size');
+            if (size) {
+              filePath = `${file.localPath}_${size}`;
+            }
+            const contentType = mime.contentType(file.name);
+            return response.header('Content-Type', contentType).status(200).sendFile(filePath);
+          } catch (error) {
+            console.log(error);
+            return response.status(404).json({ error: 'Not found' });
+          }
+        } else {
+          console.log(`Wrong user: file.userId=${file.userId}; userId=${user._id}`);
+          return response.status(404).json({ error: 'Not found' });
+        }
+      }
+    });
+  }
+
+  // const user = await FilesController.getUser(request);
+  // if (!user) {
+  // return response.status(404).json({ error: 'Not found' });
+  // }
+
+  // const fileId = request.params.id;
+  // const size = request.query.size || null;
+  // const userId = user._id.toString();
+
+  // const file = await (await dbClient.filesCollection()).findOne({
+  // _id: new mongoDBCore.BSON.ObjectId(fileId),
+  // });
+  // if (!file) {
+  //   return response.status(404).json({ error: 'Not found' });
+  //  }
+
+  // if (!file.isPublic && (userId !== file.userId.toString())) {
+  //  return response.status(404).json({ error: 'Not found' });
+  // }
+  // if (file.type === 'folder') {
+  //  return response.status(400).json({ error: "A folder doesn't have content" });
+  // }
+
+  // try {
+  // const filePath = file.localPath;
+  // const fileContent = await fs.readFile(filePath);
+
+  //    const contentType = mime.contentType(file.name);
+  //  response.setHeader('Content-Type', contentType);
+
+  // response.status(200).send(fileContent);
+  // } catch (error) {
+  // return response.status(404).json({ error: 'Not found' });
+  // }
+  // let filePath = file.localPath;
+  // if (size)  {
+  // filePath = `${file.localPath}_$(size)`;
+  // }
+
+  // if (fs.existSync(filePath))const data =
+
+  // }
 }
 
 module.exports = FilesController;
